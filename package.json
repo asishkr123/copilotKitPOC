@@ -1,0 +1,49 @@
+{
+  "name": "template.nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "NODE_ENV=production next build",
+    "start": "next start -p 5001",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "^1.0.14",
+    "@copilotkit/backend": "^0.37.0",
+    "@copilotkit/react-core": "^1.51.2",
+    "@copilotkit/react-ui": "^1.51.2",
+    "@copilotkit/runtime": "^1.51.2",
+    "@copilotkitnext/agent": "1.51.2",
+    "@copilotkitnext/runtime": "1.51.2",
+    "@emotion/cache": "^11.13.1",
+    "@emotion/react": "^11.13.3",
+    "@emotion/server": "^11.11.0",
+    "@emotion/styled": "^11.13.0",
+    "@mui/icons-material": "^6.1.5",
+    "@mui/lab": "^6.0.0-beta.13",
+    "@mui/material": "^6.1.5",
+    "@mui/material-nextjs": "^6.1.6",
+    "@svgr/webpack": "^8.1.0",
+    "ai": "^6.0.50",
+    "axios": "^1.7.7",
+    "connect-redis": "^7.1.1",
+    "convict": "^6.2.4",
+    "convict-format-with-validator": "^6.2.0",
+    "d3": "^7.9.0",
+    "ioredis": "^5.4.1",
+    "next": "^15.3.3",
+    "openai": "^6.16.0",
+    "pino": "^9.5.0",
+    "prop-types": "^15.8.1",
+    "react": "19.0.0-rc-69d4b800-20241021",
+    "react-dom": "19.0.0-rc-69d4b800-20241021",
+    "uuidv4": "^6.2.13",
+    "zod": "^3.25.75"
+  },
+  "devDependencies": {
+    "eslint": "^9.29.0",
+    "eslint-config-next": "^15.3.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,8 @@
+// first we will get the tools that are present in the mcp server . = copilotkit will do on mount . 
+// get_feed_stories , invoke_top_brands_api
+// asked a question 
+// question goes to the openAI agent that we have - builtInAgent
+// that agent decides which mcp tool to call to fetch the data 
+// once the data arrives . then agent decides what the user needs , for e.g chart .
+// then it will call function . it will convert to a chart specification . 
+// and it passes it to the client . now the client will render it using d3.js .
