@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import Grid from '@mui/material/Grid'
 import { useRenderToolCall } from '@copilotkit/react-core'
-import { ChartSpecRenderer, chartSpecSchema } from '@/components/charts'
+import { ChartSpecRenderer, chartSpecSchema } from '../charts'
 
 // function ChartSkeleton() {
 //   return (

@@ -1,8 +1,8 @@
 import { createMCPClient } from '@ai-sdk/mcp'
 import { defineTool, convertJsonSchemaToZodSchema } from '@copilotkitnext/agent'
-import { getMcpConfig } from '@/config/mcp'
+import { getMcpConfig } from '../config/mcp'
 import { z } from 'zod'
-import { normalizeToolResult } from '@/mcp/mcp-client'
+import { normalizeToolResult } from './normalizeToolResult'
 
 /**
  * Get the raw JSON Schema from an MCP tool's inputSchema (from the server).
@@ -39,6 +39,21 @@ function buildAgentToolDescription(toolName, mcpDescription) {
     typeof mcpDescription === 'string' && mcpDescription.trim()
       ? mcpDescription.trim()
       : `Analytics tool: ${toolName}`
+
+  // Special handling for data retrieval tools
+  if (toolName.includes('top_brands') || toolName.includes('market_share')) {
+    return `
+CRITICAL: Before calling this tool, you MUST have already called get_available_hierarchy and extracted the EXACT category values from its result.
+
+This tool requires exact division/category/subCategory/articleType values that exist in the hierarchy.
+DO NOT guess or invent category names like "hair care & styling" - they will fail.
+ONLY use values you found by searching through the hierarchy result array.
+
+${base}
+
+When you call this tool, you must explain in your response which hierarchy entry you used.
+`.trim()
+  }
 
   return `
 Use this tool when the user asks for factual, data-backed answers about brands, rankings, metrics, performance, trends, or analytics. Do not answer such questions from general knowledge.
@@ -83,20 +98,47 @@ export async function createMcpAgentTools() {
         }
 
         if (hasDateParam) {
-          // Always use a date six months in the past (YYYY-MM) and ignore incoming `date` in args
-          const sixMonthsAgo = new Date()
-          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-          const sixMonthsYYYYMM = `${sixMonthsAgo.getFullYear()}-${String(
-            sixMonthsAgo.getMonth() + 1
-          ).padStart(2, '0')}`
-          adjustedArgs.date = sixMonthsYYYYMM
+          // Use same date as hierarchy to ensure consistency
+          adjustedArgs.date = '2026-01'
         }
+
+        console.log(`[MCP Tool] Calling ${name} with args:`, JSON.stringify(adjustedArgs, null, 2))
 
         try {
           const result = await tool.execute(adjustedArgs, {})
-          return normalizeToolResult(result)
+          
+          // Check if the MCP tool returned success=false BEFORE normalizing
+          if (result.content?.[0]?.text) {
+            try {
+              const parsedResult = JSON.parse(result.content[0].text)
+              if (parsedResult.success === false) {
+                const errorMsg = parsedResult.message || 'No data available'
+                console.error(`[MCP Tool] ${name} failed:`, {
+                  message: parsedResult.message,
+                  errorCode: parsedResult.errorCode,
+                  args: adjustedArgs
+                })
+                // Return simple text to avoid OpenAI rejection
+                return `Error: ${name} failed with parameters ${JSON.stringify(adjustedArgs)}. No data available.`
+              }
+            } catch (e) {
+              // Not JSON or parsing failed, continue with normalization
+            }
+          }
+          
+          const normalized = normalizeToolResult(result)
+          
+          console.log(`[MCP Tool] ${name} returned:`, {
+            componentId: normalized.componentId,
+            hasData: !!normalized.rawData,
+            success: 'success'
+          })
+          
+          return normalized
         } catch (e) {
-          return { text: String(e?.message || 'Tool error'), success: false }
+          console.error(`[MCP Tool] ${name} error:`, e?.message || e)
+          // Return simple error text
+          return String(e?.message || 'Tool execution error')
         }
       }
     })

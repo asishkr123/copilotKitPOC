@@ -5,7 +5,7 @@ import Box from '@mui/material/Box'
 import Fab from '@mui/material/Fab'
 import ChatIcon from '@mui/icons-material/Chat'
 import Drawer from '@mui/material/Drawer'
-import { MaiaChat } from '@/maia/chat/MaiaChat'
+import { MaiaChat } from './maia/chat/MaiaChat'
 
 export default function MaiaFabPage() {
   const [open, setOpen] = useState(false)

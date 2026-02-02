@@ -6,6 +6,7 @@ import { getOrCreateThreadId } from '../../../utils/threads'
 
 export const CopilotProvider = ({ children }) => {
   const threadId = getOrCreateThreadId()
+  
   return (
     <CopilotKit
       threadId={threadId}
@@ -17,3 +18,4 @@ export const CopilotProvider = ({ children }) => {
     </CopilotKit>
   )
 }
+

@@ -11,57 +11,44 @@
  * The agent will normalize the raw data based on componentId.
  */
 export function normalizeToolResult(result) {
-  if (result == null) {
-    return {
-      componentId: 'text-plain',
-      rawData: null,
-      meta: {}
-    }
+  if (!result || typeof result !== 'object') {
+    return { text: String(result || '') }
   }
 
-  if (result.isError) {
-    const msg = result.content?.find((c) => c?.type === 'text')?.text || 'MCP tool error'
-    return {
-      componentId: 'text-plain',
-      rawData: { text: `Error: ${msg}` },
-      meta: {}
-    }
+  // Check if result has the expected MCP structure
+  if (!result.content || !Array.isArray(result.content)) {
+    return { text: JSON.stringify(result) }
   }
 
-  // Extract the actual data from MCP response
-  let parsed = result
+  let componentIdFromMeta = null
   
-  if (result.toolResult != null) {
-    parsed = result.toolResult
-  } else if (Array.isArray(result.content)) {
-    const text = result.content
-      .filter((c) => c?.type === 'text' && c?.text)
-      .map((c) => c.text)
-      .join(' ')
-    
-    if (text) {
-      try {
-        parsed = JSON.parse(text)
-      } catch {
-        return {
-          componentId: 'text-plain',
-          rawData: { text },
-          meta: {}
-        }
-      }
+  // Extract componentId from _meta if present
+  const firstContent = result.content.find(c => c?.type === 'text')
+  if (firstContent?._meta?.component) {
+    componentIdFromMeta = firstContent._meta.component
+  }
+
+  // Try to parse the text content
+  let parsed = null
+  const textContent = firstContent?.text
+  if (textContent && typeof textContent === 'string') {
+    try {
+      parsed = JSON.parse(textContent)
+    } catch (e) {
+      return { text: textContent }
     }
   }
 
   // New format: MCP provides componentId + raw data
   if (parsed && typeof parsed === 'object') {
-    const componentId = parsed.componentId || null
+    const componentId = componentIdFromMeta || parsed.componentId || null
     const meta = parsed.meta || {}
     
-    // If componentId is provided, return it with raw data for agent normalization
     if (componentId) {
+      const rawData = parsed.data || parsed.rawData || parsed.result || parsed
       return {
         componentId,
-        rawData: parsed.data || parsed.rawData || parsed,
+        rawData,
         meta
       }
     }

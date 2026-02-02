@@ -2,7 +2,7 @@
 
 import Box from '@mui/material/Box'
 import Grid from '@mui/material/Grid'
-import { getComponentById } from '@/components/component-registry'
+import { getComponentById } from './component-registry'
 
 /**
  * Multi-component layout renderer

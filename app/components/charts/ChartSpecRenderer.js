@@ -131,7 +131,11 @@ export function ChartSpecRenderer({ spec }) {
       // Bar chart: use horizontal bars when many categories so labels stay readable.
       const manyCategories = data.length > 8
       const maxLabelLen = 18
-      const truncate = (s) => (s.length > maxLabelLen ? `${s.slice(0, maxLabelLen)}…` : s)
+      const truncate = (s) => {
+        if (!s) return ''
+        const str = String(s)
+        return str.length > maxLabelLen ? `${str.slice(0, maxLabelLen)}…` : str
+      }
 
       if (manyCategories) {
         // Horizontal bar chart: labels on y-axis (no overlap), values on x-axis.

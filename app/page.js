@@ -1,7 +1,7 @@
 'use client'
 
 import Box from '@mui/material/Box'
-import { MaiaChat } from '@/maia/chat/MaiaChat'
+import { MaiaChat } from './maia/chat/MaiaChat'
 
 export function AgentStatus() {
   const { agent } = userAgent()

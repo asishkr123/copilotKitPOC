@@ -1,5 +1,5 @@
 import { createMCPClient } from '@ai-sdk/mcp'
-import { getMcpConfig } from '@/config/mcp'
+import { getMcpConfig } from '../config/mcp'
 
 export function normalizeToolResult(result) {
   if (result == null) {

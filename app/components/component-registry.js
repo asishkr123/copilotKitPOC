@@ -1,7 +1,7 @@
-import { ChartSpecRenderer } from '@/components/charts'
-import { KpiRenderer } from '@/components/KpiRenderer'
-import { TextRenderer } from '@/components/TextRenderer'
-import { MultiComponentRenderer } from '@/components/MultiComponentRenderer'
+import { ChartSpecRenderer } from './charts'
+import { KpiRenderer } from './KpiRenderer'
+import { TextRenderer } from './TextRenderer'
+import { MultiComponentRenderer } from './MultiComponentRenderer'
 
 /**
  * Central registry mapping componentId to React components
