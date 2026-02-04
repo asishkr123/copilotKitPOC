@@ -7,11 +7,11 @@ import { useRenderTools } from '../../components/copilot-tools/render-tools'
 import { useFrontendTools } from '../../components/copilot-tools/frontend-tools'
 import { mergeChatConfig } from '../../config/chat-ui'
 import { MaiaInput } from '../../components/maia-chat/MaiaInput'
-import { getOrCreateThreadId } from '../../../utils/threads'
+import { getOrCreateThreadId, handleSharedThread } from '../../../utils/threads'
 import React, { useState, useEffect } from 'react'
 import CircularProgress from '@mui/material/CircularProgress'
 import Typography from '@mui/material/Typography'
-import { TextMessage, ActionExecutionMessage, ResultMessage } from "@copilotkit/runtime-client-gql";
+import { MessageHistory } from '../../components/message-history'
 
 export function FullScreenSpinner({ label = 'Loading insights…' }) {
   return (
@@ -19,7 +19,7 @@ export function FullScreenSpinner({ label = 'Loading insights…' }) {
       sx={{
         position: 'fixed',
         inset: 0,
-        zIndex: 2000, // above Drawer (1300) and FAB
+        zIndex: 2000,
         bgcolor: 'rgba(255, 255, 255, 0.9)',
         display: 'flex',
         flexDirection: 'column',
@@ -49,103 +49,111 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
   const hasWrapper = chatConfig.wrapperClassName || chatConfig.wrapperSx
   const [showSpinner, setShowSpinner] = useState(null)
   
-  // Get thread ID and messages context
-  const threadId = getOrCreateThreadId()
-  const { messages, setMessages } = useCopilotMessagesContext()
-  console.log("messages", messages)
-  const [messagesLoaded, setMessagesLoaded] = useState(true) // Always true since we're not loading
-
-  // Note: Message loading from localStorage/API doesn't work with InMemoryAgentRunner
-  // The runner doesn't support injecting messages after initialization
-  // Messages ARE being saved, but restoration requires a custom persistent runner
+  // Handle shared threads before getting thread ID
+  const [threadId, setThreadId] = useState(null)
   
-  // Load saved messages on mount - DISABLED because InMemoryAgentRunner doesn't support it
-  // useEffect(() => {
-  //   if (!threadId || messagesLoaded) return;
-  //   console.log('[MaiaChat] Loading messages for thread:', threadId)
-  //   fetch(`/api/messages?threadId=${threadId}`)
-  //     .then(res => res.json())
-  //     .then(data => {
-  //       console.log('[MaiaChat] Loaded data:', data)
-  //       if (data.messages && data.messages.length > 0) {
-  //         const parsed = data.messages.map((msg) => {
-  //           if (msg.type === "TextMessage") return new TextMessage({ ...msg });
-  //           if (msg.type === "ActionExecutionMessage") return new ActionExecutionMessage({ ...msg });
-  //           if (msg.type === "ResultMessage") return new ResultMessage({ ...msg });
-  //           return msg;
-  //         });
-  //         console.log('[MaiaChat] Setting parsed messages:', parsed)
-  //         setMessages(parsed);
-  //       } else {
-  //         console.log('[MaiaChat] No saved messages found')
-  //       }
-  //       setMessagesLoaded(true);
-  //     })
-  //     .catch((err) => {
-  //       console.error('[MaiaChat] Failed to load messages:', err)
-  //       setMessagesLoaded(true)
-  //     });
-  // }, [threadId, messagesLoaded, setMessages]);
-
-  // Save messages whenever they change (with debounce)
   useEffect(() => {
-    if (!threadId || !messagesLoaded || messages.length === 0) return;
+    async function initThread() {
+      // Check for shared thread first
+      const sharedId = await handleSharedThread()
+      if (sharedId) {
+        setThreadId(sharedId)
+      } else {
+        setThreadId(getOrCreateThreadId())
+      }
+    }
+    initThread()
+  }, [])
+  
+  // Get CopilotKit's message context
+  const { messages: copilotMessages, setMessages } = useCopilotMessagesContext()
+  
+  const [loading, setLoading] = useState(false)
+  const [initialLoad, setInitialLoad] = useState(true)
+  
+  // Load messages from DB into CopilotKit context
+  useEffect(() => {
+    if (!threadId) return
     
-    console.log('[MaiaChat] Messages changed, scheduling save. Count:', messages.length)
+    console.log('[MaiaChat] Loading messages for thread:', threadId)
+    setLoading(true)
     
-    // Debounce saves to avoid excessive API calls
-    const timeoutId = setTimeout(() => {
-      // Serialize messages for storage
-      const messagesToSave = messages.map(msg => ({
-        ...msg,
-        type: msg.constructor?.name || msg.type || 'TextMessage',
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        toolCalls: msg.toolCalls,
-        toolCallId: msg.toolCallId,
-        createdAt: msg.createdAt || new Date().toISOString()
-      }));
-
-      console.log('[MaiaChat] Saving messages:', messagesToSave)
-      
-      // Save to backend (fire and forget)
-      fetch(`/api/messages`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId, messages: messagesToSave })
+    fetch(`/api/messages?threadId=${threadId}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log('[MaiaChat] Loaded', data.messages?.length, 'messages from DB')
+        if (setMessages) {
+            setMessages(data.messages || [])
+        }
+        setLoading(false)
+        setInitialLoad(false)
       })
-        .then(res => res.json())
-        .then(data => console.log('[MaiaChat] Save response:', data))
-        .catch(err => console.error('[MaiaChat] Failed to save messages:', err));
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [messages, threadId, messagesLoaded]);
+      .catch(err => {
+        console.error('[MaiaChat] Failed to load messages:', err)
+        setLoading(false)
+        setInitialLoad(false)
+      })
+  }, [threadId, setMessages])
+  
+  // Auto-sync messages to backend after conversation updates
+  useEffect(() => {
+    // Don't sync during initial load or if no messages
+    if (initialLoad || !copilotMessages || copilotMessages.length === 0) {
+      return
+    }
+    
+    // Debounce sync to avoid excessive calls during streaming
+    const syncTimeout = setTimeout(async () => {
+      try {
+        console.log('[MaiaChat] Auto-syncing', copilotMessages.length, 'messages to backend')
+        
+        const response = await fetch('/api/messages/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            threadId,
+            messages: copilotMessages
+          })
+        })
+        
+        if (!response.ok) {
+          console.error('[MaiaChat] Sync failed:', response.statusText)
+        } else {
+          const data = await response.json()
+          console.log('[MaiaChat] ✅ Synced', data.saved, 'messages successfully')
+        }
+      } catch (error) {
+        console.error('[MaiaChat] Sync error:', error)
+      }
+    }, 2000) // Wait 2 seconds after message changes to sync
+    
+    return () => clearTimeout(syncTimeout)
+  }, [threadId, copilotMessages, initialLoad])
 
   const chat = (
     <React.Fragment>
+      <MessageHistory messages={copilotMessages}/>
       <CopilotChat
         instructions={MAIA_INSTRUCTIONS}
-        // onInProgress={(inProgress) => setShowSpinner(inProgress)}
         labels={{
           title: 'Maia',
           placeholder: 'How may I help you today?'
         }}
         className={chatConfig.className}
         Input={MaiaInput}
-        stream
+        
       />
+      {showSpinner && <FullScreenSpinner label={showSpinner} />}
     </React.Fragment>
   )
 
-  if (hasWrapper) {
-    return (
-      <Box className={chatConfig.wrapperClassName} sx={chatConfig.wrapperSx}>
-        {chat}
-      </Box>
-    )
+  if (!hasWrapper) {
+    return chat
   }
 
-  return chat
+  return (
+    <Box className={chatConfig.wrapperClassName} sx={chatConfig.wrapperSx}>
+      {chat}
+    </Box>
+  )
 }

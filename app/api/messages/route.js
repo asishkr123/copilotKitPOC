@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
-import { loadMessages, listThreads, saveMessages } from '../../../lib/storage/filesystem'
+import {  loadMessages, loadMessagesPaginated, listThreads, saveMessages } from '../../../lib/storage/filesystem'
 
 /**
- * GET /api/messages?threadId=xxx
- * Load messages for a specific thread
+ * GET /api/messages?threadId=xxx&limit=5&offset=0
+ * Load messages for a specific thread with pagination
  */
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const threadId = searchParams.get('threadId')
+  const limit = parseInt(searchParams.get('limit') || '5')
+  const offset = parseInt(searchParams.get('offset') || '0')
 
   if (!threadId) {
     return NextResponse.json(
@@ -17,11 +19,19 @@ export async function GET(req) {
   }
 
   try {
-    const messages = await loadMessages(threadId)
+    // Use pagination if limit is provided, otherwise load all
+    const messages = limit > 0 
+      ? await loadMessagesPaginated(threadId, limit, offset)
+      : await loadMessages(threadId)
+    
+    // Check if there are more messages
+    const hasMore = messages.length === limit
+    
     return NextResponse.json({
       threadId,
       messages,
-      count: messages.length
+      count: messages.length,
+      hasMore
     })
   } catch (error) {
     console.error('Failed to load messages:', error)

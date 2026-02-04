@@ -6,3 +6,27 @@
 // once the data arrives . then agent decides what the user needs , for e.g chart .
 // then it will call function . it will convert to a chart specification . 
 // and it passes it to the client . now the client will render it using d3.js .
+
+
+// this is the first query , this will be fired and data will come back and the user sees the data . 
+// before saving the message , we create the context - 20 words and save it . this save will happen to the db under the threadId .
+// couple more queries will be fired . 
+// context again will be created .
+// user comes back to the application 
+// then in memory agent takes over, show the messages and the basic flow works . 
+// memory is exhausted . and the messages are not here .
+// we will fetch from the db and show a UI(CustomComponent) , this UI will not dependent on CopilotKit . 
+// planning to just render the latest 5 messages that the user has asked . here the context will be available from db. 
+// let's say the user clicks on a chart which is inside our custom component passing the context there . 
+
+<UserMessage />
+<CustomComponent /> - 5 messages  - messages that being rendered . 
+<CopilotKit /> -  copilotKit  - input .
+
+
+
+// copilot. - UI will be ready for you . there workflow 
+
+
+
+
