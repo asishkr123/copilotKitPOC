@@ -8,7 +8,7 @@ import { useFrontendTools } from '../../components/copilot-tools/frontend-tools'
 import { mergeChatConfig } from '../../config/chat-ui'
 import { MaiaInput } from '../../components/maia-chat/MaiaInput'
 import { getOrCreateThreadId, handleSharedThread } from '../../../utils/threads'
-import React, { useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import CircularProgress from '@mui/material/CircularProgress'
 import Typography from '@mui/material/Typography'
 import { MessageHistory } from '../../components/message-history'
@@ -48,10 +48,9 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
   const chatConfig = mergeChatConfig(chatConfigOverrides)
   const hasWrapper = chatConfig.wrapperClassName || chatConfig.wrapperSx
   const [showSpinner, setShowSpinner] = useState(null)
-  
   // Handle shared threads before getting thread ID
   const [threadId, setThreadId] = useState(null)
-  
+
   useEffect(() => {
     async function initThread() {
       // Check for shared thread first
@@ -64,49 +63,63 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
     }
     initThread()
   }, [])
-  
-  // Get CopilotKit's message context
-  const { messages: copilotMessages, setMessages } = useCopilotMessagesContext()
-  
+  const { messages: copilotMessages } = useCopilotMessagesContext()
   const [loading, setLoading] = useState(false)
   const [initialLoad, setInitialLoad] = useState(true)
-  
-  // Load messages from DB into CopilotKit context
+  const [persistedMessages, setPersistedMessages] = useState([])
+  const historyRef = useRef(null)
+  const isUserScrollUpRef = useRef(false)
+  const isProgrammaticScrollRef = useRef(false)
+  const hasLoadedPersistedRef = useRef(false)
+
+  useEffect(() => {
+    hasLoadedPersistedRef.current = false
+    setPersistedMessages([])
+    setInitialLoad(true)
+  }, [threadId])
+
+  // Load last 5 messages from DB for persisted history (not injected into CopilotKit)
   useEffect(() => {
     if (!threadId) return
-    
+    if (hasLoadedPersistedRef.current) return
+    if (copilotMessages && copilotMessages.length > 0) {
+      // In-memory session already has messages; skip persisted load
+      hasLoadedPersistedRef.current = true
+      setInitialLoad(false)
+      return
+    }
+
     console.log('[MaiaChat] Loading messages for thread:', threadId)
     setLoading(true)
-    
-    fetch(`/api/messages?threadId=${threadId}`)
-      .then(res => res.json())
-      .then(data => {
+
+    fetch(`/api/messages?threadId=${threadId}&limit=5&offset=0`)
+      .then((res) => res.json())
+      .then((data) => {
         console.log('[MaiaChat] Loaded', data.messages?.length, 'messages from DB')
-        if (setMessages) {
-            setMessages(data.messages || [])
-        }
+        setPersistedMessages(data.messages || [])
+        hasLoadedPersistedRef.current = true
         setLoading(false)
         setInitialLoad(false)
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('[MaiaChat] Failed to load messages:', err)
         setLoading(false)
         setInitialLoad(false)
       })
-  }, [threadId, setMessages])
-  
+  }, [threadId, copilotMessages])
+
   // Auto-sync messages to backend after conversation updates
   useEffect(() => {
     // Don't sync during initial load or if no messages
     if (initialLoad || !copilotMessages || copilotMessages.length === 0) {
+      setLoading
       return
     }
-    
+
     // Debounce sync to avoid excessive calls during streaming
     const syncTimeout = setTimeout(async () => {
       try {
         console.log('[MaiaChat] Auto-syncing', copilotMessages.length, 'messages to backend')
-        
         const response = await fetch('/api/messages/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -115,7 +128,6 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
             messages: copilotMessages
           })
         })
-        
         if (!response.ok) {
           console.error('[MaiaChat] Sync failed:', response.statusText)
         } else {
@@ -126,23 +138,54 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
         console.error('[MaiaChat] Sync error:', error)
       }
     }, 2000) // Wait 2 seconds after message changes to sync
-    
+
     return () => clearTimeout(syncTimeout)
   }, [threadId, copilotMessages, initialLoad])
 
+  useEffect(() => {
+    const container = historyRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      if (isProgrammaticScrollRef.current) {
+        isProgrammaticScrollRef.current = false
+        return
+      }
+      const { scrollTop, scrollHeight, clientHeight } = container
+      isUserScrollUpRef.current = scrollTop + clientHeight < scrollHeight - 8
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const container = historyRef.current
+    if (!container) return
+    if (isUserScrollUpRef.current) return
+    isProgrammaticScrollRef.current = true
+    container.scrollTop = container.scrollHeight
+  }, [persistedMessages.length, copilotMessages.length, loading])
+
   const chat = (
     <React.Fragment>
-      <MessageHistory messages={copilotMessages}/>
-      <CopilotChat
-        instructions={MAIA_INSTRUCTIONS}
-        labels={{
-          title: 'Maia',
-          placeholder: 'How may I help you today?'
-        }}
-        className={chatConfig.className}
-        Input={MaiaInput}
-        
-      />
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div className="copilotKitMessages" ref={historyRef}>
+          <div className="copilotKitMessagesContainer">
+            <MessageHistory messages={persistedMessages} renderContainer={false} />
+            <MessageHistory messages={copilotMessages} renderContainer={false} />
+          </div>
+        </div>
+        <CopilotChat
+          instructions={MAIA_INSTRUCTIONS}
+          labels={{
+            title: 'Maia',
+            placeholder: 'How may I help you today?'
+          }}
+          className={chatConfig.className}
+          Input={MaiaInput}
+        />
+      </Box>
       {showSpinner && <FullScreenSpinner label={showSpinner} />}
     </React.Fragment>
   )

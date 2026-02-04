@@ -24,21 +24,21 @@ export default function Page() {
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header with thread switcher */}
-      <Box sx={{ 
-        bgcolor: '#1976d2', 
-        p: 1, 
-        display: 'flex', 
-        alignItems: 'center',
-        gap: 2
-      }}>
+      <Box
+        sx={{
+          bgcolor: '#1976d2',
+          p: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2
+        }}
+      >
         <ThreadSwitcher />
-        <Box sx={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>
-          Maia
-        </Box>
+        <Box sx={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>Maia</Box>
       </Box>
-      
+
       {/* Chat area */}
-      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      <Box sx={{ flex: 1 }}>
         <MaiaChat />
       </Box>
     </Box>

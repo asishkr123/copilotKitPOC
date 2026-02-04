@@ -1,13 +1,11 @@
+@import "@copilotkit/react-ui/styles.css";
+
 /* Global styles */
 img {
   max-width: 100px;
   height: auto;
 }
 
-.copilotKitMessagesContainer {
-  height: 97%;
-}
-
 .copilotKitChat {
-  height: 100%;
+  height: auto;
 }

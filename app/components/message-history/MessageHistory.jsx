@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import { Box } from '@mui/material'
 import ReactMarkdown from 'react-markdown'
 import { ChartSpecRenderer } from '../charts'
 
@@ -9,7 +8,7 @@ import { ChartSpecRenderer } from '../charts'
  * MessageHistory Component
  * Renders messages exactly like CopilotKit does
  */
-export function MessageHistory({ messages = [] }) {
+export function MessageHistory({ messages = [], renderContainer = true }) {
   if (!messages || messages.length === 0) {
     return null
   }
@@ -21,13 +20,19 @@ export function MessageHistory({ messages = [] }) {
     return null
   }
 
-  return (
-    <Box sx={{ width: '100%', paddingBottom: '16px' }}>
+  const content = (
+    <>
       {visibleMessages.map((message, index) => (
         <MessageItem key={message.id || index} message={message} />
       ))}
-    </Box>
+    </>
   )
+
+  if (!renderContainer) {
+    return content
+  }
+
+  return <div className="copilotKitMessagesContainer">{content}</div>
 }
 
 /**
@@ -36,84 +41,60 @@ export function MessageHistory({ messages = [] }) {
 function MessageItem({ message }) {
   const isUser = message.role === 'user'
 
+  // Render generative UI from CopilotKit tool calls if present
+  const generativeUI =
+    typeof message.generativeUI === 'function' ? message.generativeUI() : null
+
   // Handle ActionExecutionMessage (tool calls)
   if (message.type === 'ActionExecutionMessage' && message.toolCalls) {
-    return <ToolCallRenderer toolCalls={message.toolCalls} />
+    return (
+      <div className="copilotKitMessage copilotKitAssistantMessage">
+        <ToolCallRenderer toolCalls={message.toolCalls} />
+      </div>
+    )
   }
 
   // Handle text messages
-  if (!message.content) {
+  const content = normalizeMessageContent(message.content)
+  const hasText = Boolean(content && content.trim())
+  const shouldRender = hasText || generativeUI
+
+  if (!shouldRender) {
     return null
   }
 
-  let content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content)
-  
+  let safeContent = content
+
   // Remove base64 images from markdown (they break rendering)
   // The chart is already rendered via renderComponent tool call
   if (!isUser) {
-    content = content.replace(/!\[.*?\]\(data:image\/[^)]+\)/g, '')
+    safeContent = safeContent.replace(/!\[.*?\]\(data:image\/[^)]+\)/g, '')
   }
 
+  const className = `copilotKitMessage ${
+    isUser ? 'copilotKitUserMessage' : 'copilotKitAssistantMessage'
+  }`
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: '12px',
-        paddingX: '16px'
-      }}
-    >
-      <Box
-        sx={{
-          maxWidth: '80%',
-          padding: '10px 14px',
-          borderRadius: '8px',
-          backgroundColor: isUser ? '#000000' : '#f0f0f0',
-          color: isUser ? '#ffffff' : '#000000',
-          fontSize: '14px',
-          lineHeight: 1.5,
-          // Markdown styling for assistant messages
-          ...(!isUser && {
-            '& p': { margin: '0 0 8px 0', color: '#000000' },
-            '& p:last-child': { marginBottom: 0 },
-            '& ul, & ol': { margin: '0 0 8px 0', paddingLeft: '20px', color: '#000000' },
-            '& li': { marginBottom: '4px', color: '#000000' },
-            '& strong': { fontWeight: 600, color: '#000000' },
-            '& code': { 
-              backgroundColor: '#e0e0e0', 
-              padding: '2px 4px', 
-              borderRadius: '3px',
-              fontSize: '13px',
-              color: '#000000'
-            },
-            '& pre': { 
-              backgroundColor: '#e0e0e0', 
-              padding: '12px', 
-              borderRadius: '4px',
-              overflow: 'auto',
-              color: '#000000'
-            }
-          })
-        }}
-      >
-        {isUser ? (
-          // User message - plain text, white color
-          <Box sx={{ color: '#ffffff' }}>{content}</Box>
-        ) : (
-          // Assistant message - markdown, black color, no images
-          <Box sx={{ color: '#000000' }}>
+    <div className={className}>
+      {isUser ? (
+        <div>{safeContent}</div>
+      ) : (
+        <div>
+          {generativeUI}
+          {hasText && (
             <ReactMarkdown
               components={{
                 // Disable image rendering to prevent broken base64 images
                 img: () => null
               }}
             >
-              {content}
+              {safeContent}
             </ReactMarkdown>
-          </Box>
-        )}
-      </Box>
-    </Box>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -126,7 +107,7 @@ function ToolCallRenderer({ toolCalls }) {
   }
 
   return (
-    <Box sx={{ marginBottom: '16px', paddingX: '16px' }}>
+    <div style={{ marginBottom: '16px' }}>
       {toolCalls.map((toolCall, idx) => {
         const funcName = toolCall.function?.name
         const argsString = toolCall.function?.arguments
@@ -139,18 +120,18 @@ function ToolCallRenderer({ toolCalls }) {
           // renderComponent
           if (funcName === 'renderComponent' && args.componentId?.startsWith('chart-')) {
             return (
-              <Box key={idx} sx={{ marginBottom: '12px' }}>
+              <div key={idx} style={{ marginBottom: '12px' }}>
                 <ChartSpecRenderer spec={args.componentData} />
-              </Box>
+              </div>
             )
           }
 
           // renderChartSpec (legacy)
           if (funcName === 'renderChartSpec' && args.spec) {
             return (
-              <Box key={idx} sx={{ marginBottom: '12px' }}>
+              <div key={idx} style={{ marginBottom: '12px' }}>
                 <ChartSpecRenderer spec={args.spec} />
-              </Box>
+              </div>
             )
           }
 
@@ -160,6 +141,26 @@ function ToolCallRenderer({ toolCalls }) {
           return null
         }
       })}
-    </Box>
+    </div>
   )
+}
+
+function normalizeMessageContent(content) {
+  if (!content) return ''
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map(part => {
+        if (typeof part === 'string') return part
+        if (part?.text) return part.text
+        return ''
+      })
+      .join('')
+  }
+  if (content?.text) return content.text
+  try {
+    return JSON.stringify(content)
+  } catch {
+    return String(content)
+  }
 }
