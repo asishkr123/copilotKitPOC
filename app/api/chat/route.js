@@ -86,6 +86,10 @@ function inferMessageType(msg) {
 // 3. If rawData is null, empty, or invalid:
 //    - Fallback to a text-based response using componentId = "text-plain"
 //    - Explain clearly and helpfully what data is missing.
+// 4. USER-REQUESTED CHART TYPE OVERRIDE (EXCEPTION):
+//    - If the user explicitly asks for a specific chart type (e.g., "treemap", "line chart", "bar chart"),
+//      you MUST render that chart type and not anything else.
+//    - In that case, call renderChartSpec with spec.type set to the requested chart type.
 // ────────────────────────────────────────
 // DATA NORMALIZATION RULES
 // ────────────────────────────────────────

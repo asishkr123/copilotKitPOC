@@ -79,34 +79,34 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
   }, [threadId])
 
   // Load last 5 messages from DB for persisted history (not injected into CopilotKit)
-  useEffect(() => {
-    if (!threadId) return
-    if (hasLoadedPersistedRef.current) return
-    if (copilotMessages && copilotMessages.length > 0) {
-      // In-memory session already has messages; skip persisted load
-      hasLoadedPersistedRef.current = true
-      setInitialLoad(false)
-      return
-    }
+  // useEffect(() => {
+  //   if (!threadId) return
+  //   if (hasLoadedPersistedRef.current) return
+  //   if (copilotMessages && copilotMessages.length > 0) {
+  //     // In-memory session already has messages; skip persisted load
+  //     hasLoadedPersistedRef.current = true
+  //     setInitialLoad(false)
+  //     return
+  //   }
 
-    console.log('[MaiaChat] Loading messages for thread:', threadId)
-    setLoading(true)
+  //   console.log('[MaiaChat] Loading messages for thread:', threadId)
+  //   setLoading(true)
 
-    fetch(`/api/messages?threadId=${threadId}&limit=5&offset=0`)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log('[MaiaChat] Loaded', data.messages?.length, 'messages from DB')
-        setPersistedMessages(data.messages || [])
-        hasLoadedPersistedRef.current = true
-        setLoading(false)
-        setInitialLoad(false)
-      })
-      .catch((err) => {
-        console.error('[MaiaChat] Failed to load messages:', err)
-        setLoading(false)
-        setInitialLoad(false)
-      })
-  }, [threadId, copilotMessages])
+  //   fetch(`/api/messages?threadId=${threadId}&limit=5&offset=0`)
+  //     .then((res) => res.json())
+  //     .then((data) => {
+  //       console.log('[MaiaChat] Loaded', data.messages?.length, 'messages from DB')
+  //       setPersistedMessages(data.messages || [])
+  //       hasLoadedPersistedRef.current = true
+  //       setLoading(false)
+  //       setInitialLoad(false)
+  //     })
+  //     .catch((err) => {
+  //       console.error('[MaiaChat] Failed to load messages:', err)
+  //       setLoading(false)
+  //       setInitialLoad(false)
+  //     })
+  // }, [threadId, copilotMessages])
 
   // Auto-sync messages to backend after conversation updates
   useEffect(() => {
@@ -170,12 +170,12 @@ export function MaiaChat({ chatConfig: chatConfigOverrides }) {
   const chat = (
     <React.Fragment>
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="copilotKitMessages" ref={historyRef}>
+        {/* <div className="copilotKitMessages" ref={historyRef}>
           <div className="copilotKitMessagesContainer">
             <MessageHistory messages={persistedMessages} renderContainer={false} />
             <MessageHistory messages={copilotMessages} renderContainer={false} />
           </div>
-        </div>
+        </div> */}
         <CopilotChat
           instructions={MAIA_INSTRUCTIONS}
           labels={{
